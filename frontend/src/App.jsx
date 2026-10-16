@@ -65,7 +65,9 @@ function App() {
     }
   }
 
+
   async function handleLogout() {
+    setLoading(true);
     setMessage("");
 
     try {
@@ -82,18 +84,23 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Logout failed.");
+        throw new Error(data.message || `Logout failed (${response.status})`);
       }
 
       setLoggedIn(false);
+      setUserEmail("");
       setEmail("");
       setPassword("");
-      setUserEmail("");
-      setMessage(data.message);
+      setRemaining(0);
+      setMessage("Logged out successfully");
     } catch (error) {
-      setMessage(error.message || "Logout failed.");
+      setMessage(error.message || "Logout failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
+
+
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-100 flex items-center justify-center p-6">
@@ -120,12 +127,15 @@ function App() {
             <h2 className="mb-3 text-xl font-semibold">Welcome!</h2>
             <p className="mb-6 text-gray-600">{userEmail}</p>
 
+
             <button
               onClick={handleLogout}
-              className="w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-white hover:bg-red-600"
+              disabled={loading}
+              className="w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-white hover:bg-red-600 disabled:opacity-60"
             >
-              Logout
+              {loading ? "Logging out..." : "Logout"}
             </button>
+
           </div>
         ) : (
           <form onSubmit={handleLogin} className="space-y-4">

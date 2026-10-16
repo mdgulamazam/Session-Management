@@ -87,9 +87,12 @@ def dashboard(request):
 
 @require_POST
 def logout_view(request):
-    logout(request)
+    if request.user.is_authenticated:
+        logout(request)
+
     response = JsonResponse({
-        "message": "Logged out successfully",
+        "message": "Logged out successfully"
     })
-    response.delete_cookie("sessionid")
+
+    response.delete_cookie("sessionid", path="/")
     return response
