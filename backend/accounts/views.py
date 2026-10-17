@@ -75,8 +75,7 @@ def dashboard(request):
         )
 
     # Refresh the inactivity timer after a valid dashboard request.
-    request.session["last_activity"] = now
-    request.session.set_expiry(600)
+    
 
     return JsonResponse({
         "email": request.user.email,
@@ -96,3 +95,35 @@ def logout_view(request):
 
     response.delete_cookie("sessionid", path="/")
     return response
+
+
+
+@require_POST
+def activity_view(request):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {
+                "message": "Your session has expired. Please login again."
+            },
+            status=401,
+        )
+
+    now = time.time()
+    last_activity = request.session.get("last_activity")
+
+    if last_activity is None or now - last_activity >= 600:
+        logout(request)
+        response = JsonResponse(
+            {
+                "message": "Your session has expired. Please login again."
+            },
+            status=401,
+        )
+        response.delete_cookie("sessionid", path="/")
+        return response
+
+    request.session["last_activity"] = now
+    request.session.set_expiry(600)
+
+    return JsonResponse({"message": "Activity recorded"})
+
