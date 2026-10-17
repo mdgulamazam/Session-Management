@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const API = "http://localhost:8000/api/auth";
 
@@ -30,6 +30,8 @@ function App() {
 
     return decodeURIComponent(cookie.split("=")[1]);
   }
+
+
 
   async function handleLogin(event) {
     event.preventDefault();
@@ -64,6 +66,60 @@ function App() {
       setLoading(false);
     }
   }
+
+
+
+  useEffect(() => {
+    if (!loggedIn) return;
+
+    let lastSent = 0;
+
+    async function recordActivity() {
+      const now = Date.now();
+
+
+      if (now - lastSent < 5000) return;
+      lastSent = now;
+
+      try {
+        const csrfToken = await getCsrfToken();
+
+        const response = await fetch(`${API}/activity/`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "X-CSRFToken": csrfToken,
+          },
+        });
+
+        if (response.status === 401) {
+          const data = await response.json();
+          setLoggedIn(false);
+          setUserEmail("");
+          setRemaining(0);
+          setMessage(
+            data.message ||
+            "Your session has expired. Please login again."
+          );
+        }
+      } catch (error) {
+        console.error("Could not record activity:", error);
+      }
+    }
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+
+    events.forEach((event) =>
+      window.addEventListener(event, recordActivity, { passive: true })
+    );
+
+    return () => {
+      events.forEach((event) =>
+        window.removeEventListener(event, recordActivity)
+      );
+    };
+  }, [loggedIn]);
+
 
 
   async function handleLogout() {
