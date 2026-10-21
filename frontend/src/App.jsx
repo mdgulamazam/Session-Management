@@ -267,11 +267,11 @@ function App() {
             </svg>
           </div>
 
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-            Session<span className="text-blue-600">Manager</span>
+          <h1 className="text-3xl font-extrabold tracking-tight text-blue-600 sm:text-4xl">
+            Session <span className="text-blue-600">Manager</span>
           </h1>
 
-          <p className="mt-2 text-sm text-slate-500 sm:text-base">
+          <p className="mt-2 text-sm text-orange-500 sm:text-base">
             Secure access. Simple session management.
           </p>
         </header>

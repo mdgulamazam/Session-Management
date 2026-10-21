@@ -45,7 +45,7 @@ def login_view(request):
 
     login(request, user)
 
-    # Store the last activity time in the server-side session.
+   
     request.session["last_activity"] = time.time()
     request.session.set_expiry(600)
 
@@ -66,7 +66,7 @@ def dashboard(request):
     now = time.time()
     last_activity = request.session.get("last_activity")
 
-    # End the session after 10 minutes of inactivity.
+   
     if last_activity is None or now - last_activity >= 600:
         logout(request)
         return JsonResponse(
@@ -74,7 +74,6 @@ def dashboard(request):
             status=401,
         )
 
-    # Refresh the inactivity timer after a valid dashboard request.
     
 
     return JsonResponse({
