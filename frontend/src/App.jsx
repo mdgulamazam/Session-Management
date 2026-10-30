@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 
 const API = "http://localhost:8000/api/auth";
@@ -7,11 +6,13 @@ const SESSION_SECONDS = 600;
 function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("info");
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [remaining, setRemaining] = useState(SESSION_SECONDS);
   const [userEmail, setUserEmail] = useState("");
 
@@ -29,7 +30,9 @@ function App() {
       .find((item) => item.startsWith("csrftoken="));
 
     if (!cookie) {
-      throw new Error("CSRF token not found.");
+      throw new Error(
+        "CSRF token not found. Check Django CSRF cookie and CORS settings."
+      );
     }
 
     return decodeURIComponent(cookie.split("=")[1]);
@@ -38,6 +41,55 @@ function App() {
   function showMessage(text, type = "info") {
     setMessage(text);
     setMessageType(type);
+  }
+
+  async function handleRegister(event) {
+    event.preventDefault();
+
+    if (password !== confirmPassword) {
+      showMessage("Passwords do not match.", "error");
+      return;
+    }
+
+    setLoading(true);
+    showMessage("");
+
+    try {
+      const csrfToken = await getCsrfToken();
+
+      const response = await fetch(`${API}/register/`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken,
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          confirm_password: confirmPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Registration failed.");
+      }
+
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setIsRegistering(false);
+      showMessage(
+        data.message || "Registration successful! Please log in.",
+        "success"
+      );
+    } catch (error) {
+      showMessage(error.message || "Registration failed.", "error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleLogin(event) {
@@ -55,7 +107,7 @@ function App() {
           "Content-Type": "application/json",
           "X-CSRFToken": csrfToken,
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       const data = await response.json();
@@ -67,6 +119,7 @@ function App() {
       setUserEmail(data.email || email);
       setRemaining(SESSION_SECONDS);
       setLoggedIn(true);
+      setPassword("");
       showMessage(data.message || "Login successful.", "success");
     } catch (error) {
       showMessage(error.message || "Something went wrong.", "error");
@@ -114,13 +167,7 @@ function App() {
       }
     }
 
-    const events = [
-      "mousemove",
-      "keydown",
-      "click",
-      "scroll",
-      "touchstart",
-    ];
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
 
     events.forEach((event) =>
       window.addEventListener(event, recordActivity, { passive: true })
@@ -187,10 +234,7 @@ function App() {
         setUserEmail(data.email);
       }
 
-      showMessage(
-        data.message || "Your session is valid.",
-        "success"
-      );
+      showMessage(data.message || "Your session is valid.", "success");
     } catch (error) {
       showMessage(error.message || "Session verification failed.", "error");
     } finally {
@@ -225,6 +269,7 @@ function App() {
       setUserEmail("");
       setEmail("");
       setPassword("");
+      setConfirmPassword("");
       setRemaining(0);
       showMessage("Logged out successfully.", "success");
     } catch (error) {
@@ -375,17 +420,26 @@ function App() {
             <div>
               <div className="mb-7">
                 <p className="text-sm font-semibold text-blue-600">
-                  WELCOME
+                  {isRegistering ? "GET STARTED" : "WELCOME"}
                 </p>
+
                 <h2 className="mt-1 text-2xl font-bold text-slate-900">
-                  Sign in to your account
+                  {isRegistering
+                    ? "Create your account"
+                    : "Sign in to your account"}
                 </h2>
+
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Enter your credentials to securely access your dashboard.
+                  {isRegistering
+                    ? "Register to access your secure dashboard."
+                    : "Enter your credentials to securely access your dashboard."}
                 </p>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-5">
+              <form
+                onSubmit={isRegistering ? handleRegister : handleLogin}
+                className="space-y-5"
+              >
                 <div>
                   <label
                     htmlFor="email"
@@ -395,7 +449,7 @@ function App() {
                   </label>
                   <input
                     id="email"
-                    type="email"
+                    type="text"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     autoComplete="email"
@@ -417,12 +471,37 @@ function App() {
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    autoComplete="current-password"
+                    autoComplete={
+                      isRegistering ? "new-password" : "current-password"
+                    }
                     required
                     placeholder="Enter your password"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                   />
                 </div>
+
+                {isRegistering && (
+                  <div>
+                    <label
+                      htmlFor="confirmPassword"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Confirm Password
+                    </label>
+                    <input
+                      id="confirmPassword"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
+                      autoComplete="new-password"
+                      required
+                      placeholder="Confirm your password"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                    />
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -434,11 +513,33 @@ function App() {
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                       Please wait...
                     </>
+                  ) : isRegistering ? (
+                    "Create Account"
                   ) : (
                     "Sign In"
                   )}
                 </button>
               </form>
+
+              <div className="mt-6 text-center text-sm text-slate-500">
+                {isRegistering
+                  ? "Already have an account?"
+                  : "Don't have an account?"}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegistering((previous) => !previous);
+                    setEmail("");
+                    setPassword("");
+                    setConfirmPassword("");
+                    showMessage("");
+                  }}
+                  className="ml-2 font-semibold text-blue-600 hover:text-violet-600"
+                >
+                  {isRegistering ? "Login" : "Register"}
+                </button>
+              </div>
 
               <p className="mt-6 text-center text-xs leading-5 text-slate-400">
                 Protected by Django session authentication and CSRF security.

@@ -5,13 +5,78 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 
 
 @ensure_csrf_cookie
 def csrf(request):
     return JsonResponse({"message": "CSRF cookie set"})
 
+@ratelimit(key="ip", rate="5/m", method="POST", block=True)
 
+def register_view(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse(
+            {"message": "Invalid request data"},
+            status=400,
+        )
+
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+    confirm_password = data.get("confirm_password", "")
+
+    if not email or not password or not confirm_password:
+        return JsonResponse(
+            {"message": "Email, password, and password confirmation are required"},
+            status=400,
+        )
+
+
+    if password != confirm_password:
+        return JsonResponse(
+            {"message": "Passwords do not match"},
+            status=400,
+        )
+
+    User = get_user_model()
+
+    if User.objects.filter(email__iexact=email).exists():
+        return JsonResponse(
+            {"message": "An account with this email already exists"},
+            status=400,
+        )
+
+    try:
+        validate_password(password)
+    except ValidationError as error:
+        return JsonResponse(
+            {"message": " ".join(error.messages)},
+            status=400,
+        )
+
+    try:
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+        )
+    except IntegrityError:
+        return JsonResponse(
+            {"message": "An account with this email already exists"},
+            status=400,
+        )
+
+    return JsonResponse(
+        {
+            "message": "Registration successful. You can now log in.",
+            "email": user.email,
+        },
+        status=201,
+    )
 @ratelimit(key="ip", rate="5/m", method="POST", block=True)
 @require_POST
 def login_view(request):
